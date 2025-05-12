@@ -39,17 +39,18 @@ class DataValidation:
         
     def detect_dataset_drift(self,base_df,current_df,threshold=0.05)->bool:
         try:
-            status=True
+            status=False    
             report={}
             for column in base_df.columns:
                 d1=base_df[column]
                 d2=current_df[column]
                 is_same_dist=ks_2samp(d1,d2)
-                if threshold<=is_same_dist.pvalue:
-                    is_found=False
-                else:
+                if threshold>=is_same_dist.pvalue:
                     is_found=True
-                    status=False
+                    status = True
+                else:
+                    is_found=False
+                    
                 report.update({column:{
                     "p_value":float(is_same_dist.pvalue),
                     "drift_status":is_found
@@ -80,6 +81,7 @@ class DataValidation:
             status=self.validate_number_of_columns(dataframe=train_dataframe)
             if not status:
                 error_message=f"Train dataframe does not contain all columns.\n"
+                
             status = self.validate_number_of_columns(dataframe=test_dataframe)
             if not status:
                 error_message=f"Test dataframe does not contain all columns.\n"   
