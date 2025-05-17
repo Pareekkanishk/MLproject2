@@ -16,11 +16,13 @@ from sklearn.ensemble import ( # type: ignore
     GradientBoostingClassifier,
     RandomForestClassifier,
 )
+import mlflow
 
+import dagshub
+dagshub.init(repo_owner='Pareekkanishk', repo_name='MLproject2', mlflow=True)
 
 class ModelTrainer:
-    def __init__(self, model_trainer_config: ModelTrainerConfig, data_transformation_artifact: DataTransformationArtifact):
-        
+    def __init__(self,model_trainer_config:ModelTrainerConfig,data_transformation_artifact:DataTransformationArtifact):
         try:
             self.model_trainer_config=model_trainer_config
             self.data_transformation_artifact=data_transformation_artifact
@@ -28,18 +30,16 @@ class ModelTrainer:
             raise NetworkSecurityException(e,sys)
         
     def track_mlflow(self,best_model,classificationmetric):
-
+       
         with mlflow.start_run():
             f1_score=classificationmetric.f1_score
-            precision_score=classificationmetric.precision_score
-            recall_score=classificationmetric.recall_score
-
-            
+            precision=classificationmetric.precision_score
+            recall=classificationmetric.recall_score
 
             mlflow.log_metric("f1_score",f1_score)
-            mlflow.log_metric("precision",precision_score)
-            mlflow.log_metric("recall_score",recall_score)
-            mlflow.sklearn.log_model(best_model,"model")
+            mlflow.log_metric("precision",precision)
+            mlflow.log_metric("recall_score",recall)
+            mlflow.sklearn.log_model(best_model, "model")
 
     def train_model(self,X_train,y_train,x_test,y_test):
         models = {
@@ -91,20 +91,26 @@ class ModelTrainer:
 
         y_train_pred=best_model.predict(X_train)
         classification_train_metric=get_classification_score(y_true=y_train,y_pred=y_train_pred)
+        ## Track the experiements with mlflow
+        self.track_mlflow(best_model,classification_train_metric)
         
-        self.track_mlfolw(best_model,classification_train_metric)
         
         y_test_pred=best_model.predict(x_test)
         classification_test_metric=get_classification_score(y_true=y_test,y_pred=y_test_pred)
+        ## Track the experiements with mlflow
+        self.track_mlflow(best_model,classification_test_metric)
 
         
         preprocessor = load_object(file_path=self.data_transformation_artifact.transformed_object_file_path)
+
+        save_object("final_model/preprocessor.pkl", preprocessor)
             
         model_dir_path = os.path.dirname(self.model_trainer_config.trained_model_file_path)
         os.makedirs(model_dir_path,exist_ok=True)
         network_model=NetworkModel(preprocessor=preprocessor,model=best_model)
 
         save_object(self.model_trainer_config.trained_model_file_path,obj=network_model)
+        save_object("final_model/model.pkl", best_model)
         
 
         ## model trainer artifact
